@@ -143,4 +143,124 @@ pop_Seoul.sort_values(by='고령자',ascending=False).head()
 # 고령자 비율이 높은 순으로 자치구 정렬
 pop_Seoul.sort_values(by='고령자비율',ascending=False).head()
 
+Pandas 고급기능- 두 DataFrame병합하기
+CCTV_Seoul.head()
+pop_Seoul.head()
+pop_Seoul.rename(columns={pop_Seoul.columns[0]:'구별'},inplace=True)
+# 열 이름 바꾸기 rename 
+# rename(columns={바꾸고싶은 컬럼 인덱스:'바꾸고 싶은 이름'},inplace-True) 
+# inplace=True 는 실제 CCTV_Seoul 변수의 내용을 갱신 
+pop_Seoul.head()
 
+# CCTV 데이터와 인구 현황 데이터 합치기 
+
+data_result= pd.merge(CCTV_Seoul,pop_Seoul,how='inner',on='구별')
+data_result.head()
+
+#의미없는 컬럼 지우기 2013년도 이전, 2014년, 2015년, 2016년
+# 행 방향 삭제 drop 
+# 열 방향 삭제 del
+
+# del data_result['2013년도 이전']
+del data_result['2014년']
+del data_result['2015년']
+del data_result['2016년']
+data_result.head()
+
+# 향후 그래프를 편하기 그리기 위해 index = 구 이름 되어야 유리 
+# 인덱스 변경 set_index
+#변수명.set_index ('새로운 인덱스명', inplace=True)
+
+
+data_result.set_index('구별',inplace=True)
+data_result.head()
+
+#상관관계 계산 numpy.corrcoef
+#상관관계 지수 0.1 이하 무시 / 0.3이하면 약한 상관관계 / 0.7이상이면 뚜렷한 상관관계 
+#고령자 비율과 cctv개수관의 상관관계 \
+np.corrcoef(data_result['고령자비율'],data_result['소계'])#약한 음의 상관관계 
+np.corrcoef(data_result['외국인비율'],data_result['소계'])
+#상관관계가 0.1대로 큰 의미 없음
+np.corrcoef(data_result['인구수'],data_result['소계'])
+#상관관계 0.3으로 약한 상관관계 
+data_result.sort_values(by='소계',ascending=False).head() //CCTV순으로 정렬
+data_result.sort_values(by='인구수',ascending=False).head() //인구수 순으로 정렬
+
+# 파이썬의 대표 시각화 도구 Matplotlib
+import matplotlib.pyplot as plt
+#맷플롯립.파이썬플롯  
+%matplotlib inline
+#그래프의 결과를 출력 세션에 나타나게 하는 설정
+
+# CCTV현황 그래프로 분석하기
+import platform 
+
+from matplotlib import font_manager, rc
+plt.rcParams['axes.unicode_minus']=False
+
+if platform.system()=='Darwin':
+    rc('font',family='AppleGothic')
+elif platform.system()=='Windows':
+       path="c:/Windows/Fonts/malgun.ttf"
+       font_name=font_manager.FontProperties(fname=path).get_name()
+       rc('font',family=font_name)
+else:
+       print('Unkown system...sorry~~~')
+ 
+//한국어를 인식하게 하기 위한 코드 
+data_result.head()
+
+#데이터에서 소계데이터만을 정렬해서 가져와서 수평선 그래프로 보여줘봐 
+data_result['소계'].sort_values().plot(kind='barh',grid=False, figsize=(8,8))
+plt.show()
+#cctv 개수에서 강남구가 월등히 많다는것을 볼수 있음 
+
+#구별 인구대비 cctv 개수를 나누어 cctv 비율 확인하고 그래프로 시각화 
+data_result['cctv비율']=data_result['소계']/data_result['인구수'] *100
+data_result.head()
+data_result['cctv비율'].sort_values().plot(kind='barh',grid=True, figsize=(10,10))
+plt.show()
+
+# 점 분산표 그래프(scatter (x,y),s=점사이즈)
+plt.figure(figsize=(10,10))
+plt.scatter(data_result['인구수'],data_result['소계'],s=50)
+plt.xlabel('인구수')
+plt.ylabel('CCTV')
+plt.grid()
+plt.show()
+
+#기울기와 절편 확인 polyfit => array(기울기, 절편)
+fp1=np.polyfit(data_result['인구수'],data_result['소계'],1)
+fp1
+f1=np.poly1d(fp1) # poly1d (폴리원디) 기울기와 절편의 값을 ax + b 형태로 만들어 주기 위한 함수  
+fx=np.linspace(100000,700000,100) #린스페이스
+# 점 분산표 그래프 + 기울기 직선 그래프 
+plt.figure(figsize=(10,10))
+plt.scatter(data_result['인구수'],data_result['소계'],s=50)
+plt.plot(fx,f1(fx),ls='dashed',lw=3,color='g') 
+# f1 = ax+b 이고 a(기울기),b(절편)값이 이미 들어가 있으므로 f1(x) x값만 넣어주면 됨  
+plt.xlabel('인구수')
+plt.ylabel('CCTV')
+plt.grid()
+plt.show()
+
+# 오차 컬럼 형성 후 
+data_result['오차'] = np.abs(data_result['소계']-f1(data_result['인구수']))
+data_result.head()
+df_sort = data_result.sort_values(by='오차',ascending=False) #오차 순으로 정렬 
+df_sort.head()
+# 오차가 높은 구별 인덱스로 표시하여 시각화 하기 
+plt.figure(figsize=(14,10))
+plt.scatter(data_result['인구수'],data_result['소계'],c=data_result['오차'],s=50)
+plt.plot(fx,f1(fx),ls='dashed',lw=3,color='g')
+
+for n in range(10):
+    plt.text(df_sort['인구수'][n]*1.02,df_sort['소계'][n]*0.98,df_sort.index[n],fontsize=15)
+
+    
+plt.xlabel('인구수')
+plt.ylabel('인구당비율')
+
+plt.colorbar()
+plt.grid()
+plt.show()
